@@ -1,6 +1,6 @@
 Welcome!
 
-Open-Driving-3D is a driving simulator that I'm making in python with panda3d. I plan to at some point add AI traffic. Its fairly simple right now, but its only on version 0.05.
+Open-Driving-3D is a driving simulator that I'm making in python with panda3d. I plan to at some point add AI traffic. Its fairly simple right now, but its only on version 0.06.
 
 The reason I wanted to create a driving sim was because there don't seem to be enough free ones.
 
