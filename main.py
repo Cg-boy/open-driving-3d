@@ -1,32 +1,6 @@
-#Welcome to Open-Driving-3D 0.05!
+#Welcome to Open-Driving-3D 0.06!
 #
 #This is still an early version, so don't expect too much.
-#
-#Controls:
-#
-#Accelerate = Up Arrow
-#
-#Turn Left = Left Arrow
-#
-#Turn Right = Right Arrow
-#
-#Brake = Down arrow
-#
-#Change View = 1, 2, 3
-#
-#Change gear = page up, page down
-#
-#Turn the car on and off = x
-#
-#Parking brake = p
-#
-#Reset car = backspace
-#
-#Hooter(Horn) = enter
-#
-#Menu = escape
-#
-#
 #Have Fun!
 #
 from direct.showbase.ShowBase import ShowBase
@@ -59,7 +33,6 @@ import sys
 class Drive(ShowBase):
 	def __init__(self):
 		ShowBase.__init__(self)
-		
 		#Setup
 		scene = BulletWorld()
 		scene.setGravity(Vec3(0, 0, -9.81))
@@ -68,7 +41,6 @@ class Drive(ShowBase):
 		fog.setColor(0.9,0.9,1.0)
 		fog.setExpDensity(0.003)
 		render.setFog(fog)
-		
 		#Lighting
 		sun = DirectionalLight("The Sun")
 		sun_np = render.attachNewNode(sun)
@@ -220,6 +192,10 @@ class Drive(ShowBase):
 			self.exit_button = DirectButton(text = "Quit", scale = 0.11, pos = (0.87,0,-0.42), command = sys.exit)
 			
 		Menu()
+		
+		
+		def take_screenshot():
+			base.screenshot("Screenshot")
 
 
 		#Controls 
@@ -241,6 +217,7 @@ class Drive(ShowBase):
 		do.accept("p", parkingbrake)
 		do.accept("backspace", rotate)
 		do.accept("enter", hooter)
+		do.accept("f12", take_screenshot)
 		
 		#The ground
 		self.ground = BulletPlaneShape(Vec3(0, 0, 1,), 1)
