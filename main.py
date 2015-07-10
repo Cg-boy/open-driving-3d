@@ -3,6 +3,10 @@
 #This is still an early version, so don't expect too much.
 #Have Fun!
 #
+from panda3d.core import loadPrcFileData
+
+loadPrcFileData("", "win-size 1200 600")
+loadPrcFileData("", "audio-libary-name p3openal-audio")
 from direct.showbase.ShowBase import ShowBase
 from direct.gui.DirectGui import *
 from panda3d.bullet import BulletWorld
@@ -19,13 +23,13 @@ from direct.showbase.DirectObject import DirectObject
 from direct.gui.OnscreenImage import OnscreenImage
 from panda3d.core import TransparencyAttrib
 from panda3d.core import Fog
-from panda3d.core import GeoMipTerrain
 from panda3d.core import DirectionalLight
 from panda3d.core import AmbientLight
 from panda3d.core import VBase4
 from panda3d.core import NodePath
 from panda3d.core import Spotlight
 from panda3d.core import PerspectiveLens
+from direct.gui.OnscreenText import OnscreenText
 import sys
 
 
@@ -36,6 +40,7 @@ class Drive(ShowBase):
 		#Setup
 		scene = BulletWorld()
 		scene.setGravity(Vec3(0, 0, -9.81))
+		#scene.setDebugNode(debug_np.node())
 		base.setBackgroundColor(0.6,0.9,0.9)
 		fog = Fog("The Fog")
 		fog.setColor(0.9,0.9,1.0)
@@ -63,10 +68,17 @@ class Drive(ShowBase):
 		
 		self.time = 0
 		
+		self.headlight_var = 0
+		
+		self.RPM = 0
+		
+		self.clutch = 0
+		
+		
 		#Functions
 		def V1():
-			camera.setPos(0.25,-1.4,0.5)
-			camera.setHpr(0,-12,0)
+			camera.setPos(0.25,-1.2,0.5)
+			camera.setHpr(0,-13,0)
 			
 		def V2():
 			camera.setPos(0,-15,3)
@@ -90,10 +102,12 @@ class Drive(ShowBase):
 			self.start = 1
 			self.start_sound.play()
 			self.engine_idle_sound.play()
+			self.RPM = 1000
 			
 		def stop_function():
 			self.start = 0
 			self.engine_idle_sound.stop()
+			self.RPM = 0
 				
 		def parkingbrake():
 			self.Pbrake = (self.Pbrake + 1) % 2
@@ -196,6 +210,32 @@ class Drive(ShowBase):
 		
 		def take_screenshot():
 			base.screenshot("Screenshot")
+			
+		def set_headlights():
+			if self.headlight_var == 1:
+				Headlight1.setColor(VBase4(9.0,8.9,8.9,1))
+				Headlight2.setColor(VBase4(9.0,8.9,8.9,1))
+			if self.headlight_var == 0:
+				Headlight1.setColor(VBase4(0,0,0,1))
+				Headlight2.setColor(VBase4(0,0,0,1))
+			
+		def headlights():
+			self.headlight_var = (self.headlight_var + 1) % 2
+			
+		def update_rpm():
+			if self.start == 1:
+				self.RPM = self.RPM -2
+				
+				if self.RPM < 550:
+					self.RPM = 550
+				if self.RPM < 600:
+					self.clutch = 1
+				else:
+					self.clutch = 0
+					
+				if self.RPM > 6000:
+					self.RPM = 6000
+					
 
 
 		#Controls 
@@ -218,6 +258,7 @@ class Drive(ShowBase):
 		do.accept("backspace", rotate)
 		do.accept("enter", hooter)
 		do.accept("f12", take_screenshot)
+		do.accept("h", headlights)
 		
 		#The ground
 		self.ground = BulletPlaneShape(Vec3(0, 0, 1,), 1)
@@ -268,6 +309,26 @@ class Drive(ShowBase):
 		Sw.reparentTo(Car_np)
 		Sw.setPos(0.25,0,-0.025)
 		
+		#The first headlight
+		Headlight1 = Spotlight("Headlight1")
+		lens = PerspectiveLens()
+		lens.setFov(180)
+		Headlight1.setLens(lens)
+		Headlight1np = render.attachNewNode(Headlight1)
+		Headlight1np.reparentTo(Car_np)
+		Headlight1np.setPos(-0.8,2.5,-0.5)
+		Headlight1np.setP(-15)
+		render.setLight(Headlight1np)
+		
+		#The second headlight
+		Headlight2 = Spotlight("Headlight2")
+		Headlight2.setLens(lens)
+		Headlight2np = render.attachNewNode(Headlight2)
+		Headlight2np.reparentTo(Car_np)
+		Headlight2np.setPos(0.8,2.5,-0.5)
+		Headlight2np.setP(-15)
+		render.setLight(Headlight2np)
+		
 		#Sounds
 		self.hoot = loader.loadSfx("Sounds/hoot.ogg")
 		self.start_sound = loader.loadSfx("Sounds/enginestart.ogg")
@@ -291,10 +352,10 @@ class Drive(ShowBase):
 			w.setWheelAxleCs(Vec3(1, 0, 0))
 			w.setWheelRadius(r)
 			w.setMaxSuspensionTravelCm(40)
-			w.setSuspensionStiffness(80)
+			w.setSuspensionStiffness(120)
 			w.setWheelsDampingRelaxation(2.3)
 			w.setWheelsDampingCompression(4.4)
-			w.setFrictionSlip(100)
+			w.setFrictionSlip(50)
 			w.setRollInfluence(0.1)
 		
 		#Wheels	
@@ -318,18 +379,22 @@ class Drive(ShowBase):
 		w4_np.setColorScale(0,6)
 		Wheel(Point3(1,1,-0.6), w4_np, 0.4, False)
 		
-		
 		#Steering properties
-		self.steering = 0.0
+		self.steering = 0
 		self.steeringClamp = 35.0
-		self.steeringIncrement = 70.0
+		self.steeringIncrement = 70
 		
 		#The engine and steering
 		def processInput(dt):
+			if self.RPM > 1000:
+				self.steeringIncrement = 60
+			else:
+				self.steeringIncrement = 70
+			
 			#Reset the steering
-			if self.steering < 0.0:
+			if self.steering < 0.00:
 				self.steering = self.steering + 0.8
-			if self.steering > 0.0:
+			if self.steering > 0.00:
 				self.steering = self.steering - 0.8
 			
 			engineForce = 0.0
@@ -339,18 +404,25 @@ class Drive(ShowBase):
 			#Forward
 			if self.start == 1:
 				if inputState.isSet("F"):
-					if self.gear == 1:
-						engineForce = 1000.0
-						brakeForce = 0.0
-						self.accelerate_sound.play()
+					self.RPM = self.RPM + 20
+					self.accelerate_sound.play()
+				if self.clutch == 0:
 					if self.gear == -1:
-						engineForce = -1000.0
+						engineForce = -self.RPM / 4
+						brakeForce = 0.0
+					if self.gear == 1:
+						engineForce = self.RPM / 3
 						brakeForce = 0.0
 			
 			#Brake	
 			if inputState.isSet("B"):
 				engineForce = 0.0
-				brakeForce = 14.0
+				brakeForce = 12.0
+				if self.clutch == 0:
+					if self.gear == 1:
+						self.RPM = self.RPM - 20
+					if self.gear == -1:
+						self.RPM = self.RPM -20
 				
 			#Left	
 			if inputState.isSet("L"):
@@ -365,6 +437,7 @@ class Drive(ShowBase):
 			#Park
 			if self.Pbrake == 1:
 				brakeForce = 6.0
+				self.clutch = 1
 				
 				
 			#Apply forces to wheels	
@@ -392,6 +465,14 @@ class Drive(ShowBase):
 		self.park = OnscreenImage(image = "Textures/pbrake.png", pos = (-0.8,0,-0.85), scale = (0.1))
 		self.park.setTransparency(TransparencyAttrib.MAlpha)
 		
+		self.rev_counter = OnscreenImage(image = "Textures/dial.png", pos = (-1.6, 0.0, -0.70), scale = (0.6,0.6,0.45))
+		self.rev_counter.setTransparency(TransparencyAttrib.MAlpha)
+		
+		self.rev_needle = OnscreenImage(image = "Textures/needle.png", pos = (-1.6, 0.0, -0.70), scale = (0.5))
+		self.rev_needle.setTransparency(TransparencyAttrib.MAlpha)
+		
+		self.rev_text = OnscreenText(text = " ", pos = (-1.6, -0.92, 0), scale = 0.05)
+		
 		
 		#Update the HUD
 		def Update_HUD():
@@ -415,7 +496,12 @@ class Drive(ShowBase):
 				self.park.setTransparency(TransparencyAttrib.MAlpha)
 			else:
 				self.park.setImage("Textures/pbrake.png")
-				self.park.setTransparency(TransparencyAttrib.MAlpha)		
+				self.park.setTransparency(TransparencyAttrib.MAlpha)	
+				
+			#Update the rev counter
+			self.rev_needle.setR(self.RPM/22)	
+			rev_string = str(self.RPM)
+			self.rev_text.setText(rev_string+" RPM")
 			
 			
 		#Update
@@ -425,6 +511,8 @@ class Drive(ShowBase):
 			Update_HUD()
 			set_time()
 			set_terrain()
+			set_headlights()
+			update_rpm()
 			scene.doPhysics(dt, 5, 1.0/180.0)
 			return task.cont
 			

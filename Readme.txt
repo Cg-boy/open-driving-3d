@@ -33,4 +33,5 @@ Hooter(Horn) = enter
 Menu = escape
 
 Screenshot = f12
-_____________________
+
+Headlights = h
