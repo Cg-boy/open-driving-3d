@@ -1,4 +1,4 @@
-#Welcome to Open-Driving-3D 0.06!
+#Welcome to Open-Driving-3D 0.07!
 #
 #This is still an early version, so don't expect too much.
 #Have Fun!
@@ -37,21 +37,24 @@ import sys
 class Drive(ShowBase):
 	def __init__(self):
 		ShowBase.__init__(self)
+		
 		#Setup
 		scene = BulletWorld()
 		scene.setGravity(Vec3(0, 0, -9.81))
-		#scene.setDebugNode(debug_np.node())
 		base.setBackgroundColor(0.6,0.9,0.9)
 		fog = Fog("The Fog")
 		fog.setColor(0.9,0.9,1.0)
 		fog.setExpDensity(0.003)
 		render.setFog(fog)
 		#Lighting
+		
+		#Sun light
 		sun = DirectionalLight("The Sun")
 		sun_np = render.attachNewNode(sun)
 		sun_np.setHpr(0,-60,0)
 		render.setLight(sun_np)
 		
+		#Ambient light
 		amb = AmbientLight("The Ambient Light")
 		amb.setColor(VBase4(0.39,0.39,0.39, 1))
 		amb_np = render.attachNewNode(amb)
@@ -73,6 +76,12 @@ class Drive(ShowBase):
 		self.RPM = 0
 		
 		self.clutch = 0
+		
+		self.carmaxspeed = 100 #KPH
+		
+		self.carmaxreversespeed = -40 #KPH
+		
+		self.steering = 0
 		
 		
 		#Functions
@@ -107,7 +116,6 @@ class Drive(ShowBase):
 		def stop_function():
 			self.start = 0
 			self.engine_idle_sound.stop()
-			self.RPM = 0
 				
 		def parkingbrake():
 			self.Pbrake = (self.Pbrake + 1) % 2
@@ -115,8 +123,8 @@ class Drive(ShowBase):
 		def rotate():
 			Car_np.setHpr(0, 0, 0)
 			
-		def hooter():
-			self.hoot.play()
+		def horn():
+			self.horn_sound.play()
 			
 		def set_time():
 			if self.time == -1:
@@ -223,20 +231,35 @@ class Drive(ShowBase):
 			self.headlight_var = (self.headlight_var + 1) % 2
 			
 		def update_rpm():
+			
+			#Simulate RPM
 			if self.start == 1:
-				self.RPM = self.RPM -2
-				
-				if self.RPM < 550:
-					self.RPM = 550
+				if self.gear == 0:
+					self.RPM = self.RPM - self.RPM / 400
+				else:
+					self.RPM = self.RPM + self.carspeed / 9
+					self.RPM = self.RPM - self.RPM / 200
+			
+			#Reset RPM to 0 when engine is off
+			if self.start == 0:
+				if self.RPM > 0.0:
+					self.RPM = self.RPM - 40
+				if self.RPM < 10:
+					self.RPM = 0.0
+								
+			#Idle RPM power
+			if self.start == 1:
+				if self.RPM < 650:
+					self.RPM = self.RPM + 4
 				if self.RPM < 600:
 					self.clutch = 1
 				else:
 					self.clutch = 0
 					
-				if self.RPM > 6000:
-					self.RPM = 6000
-					
-
+			#RPM limit		
+			if self.RPM > 6000:
+				self.RPM = 6000
+				
 
 		#Controls 
 		inputState.watchWithModifiers("F", "arrow_up")
@@ -256,7 +279,7 @@ class Drive(ShowBase):
 		do.accept("x", stop_function)
 		do.accept("p", parkingbrake)
 		do.accept("backspace", rotate)
-		do.accept("enter", hooter)
+		do.accept("enter", horn)
 		do.accept("f12", take_screenshot)
 		do.accept("h", headlights)
 		
@@ -330,7 +353,7 @@ class Drive(ShowBase):
 		render.setLight(Headlight2np)
 		
 		#Sounds
-		self.hoot = loader.loadSfx("Sounds/hoot.ogg")
+		self.horn_sound = loader.loadSfx("Sounds/horn.ogg")
 		self.start_sound = loader.loadSfx("Sounds/enginestart.ogg")
 		self.engine_idle_sound = loader.loadSfx("Sounds/engineidle.ogg")
 		self.engine_idle_sound.setLoop(True)
@@ -362,12 +385,12 @@ class Drive(ShowBase):
 		w1_np = loader.loadModel("Models/Lwheel")
 		w1_np.reparentTo(render)
 		w1_np.setColorScale(0,6)
-		Wheel(Point3(-1,1,-0.6), w1_np, 0.4, True)
+		Wheel(Point3(-1,1,-0.6), w1_np, 0.4, False)
 		
 		w2_np = loader.loadModel("Models/Rwheel")
 		w2_np.reparentTo(render)
 		w2_np.setColorScale(0,6)
-		Wheel(Point3(-1.1,-1.2,-0.6), w2_np, 0.4, False)
+		Wheel(Point3(-1.1,-1.2,-0.6), w2_np, 0.4, True)
 		
 		w3_np = loader.loadModel("Models/Lwheel")
 		w3_np.reparentTo(render)
@@ -379,50 +402,72 @@ class Drive(ShowBase):
 		w4_np.setColorScale(0,6)
 		Wheel(Point3(1,1,-0.6), w4_np, 0.4, False)
 		
-		#Steering properties
-		self.steering = 0
-		self.steeringClamp = 35.0
-		self.steeringIncrement = 70
+
 		
 		#The engine and steering
 		def processInput(dt):
-			if self.RPM > 1000:
-				self.steeringIncrement = 60
-			else:
-				self.steeringIncrement = 70
 			
-			#Reset the steering
-			if self.steering < 0.00:
-				self.steering = self.steering + 0.8
-			if self.steering > 0.00:
-				self.steering = self.steering - 0.8
-			
+			#Vehicle properties
+			self.steeringClamp = 35.0
+			self.steeringIncrement = 70
 			engineForce = 0.0
 			brakeForce = 0.0
+			
+			
+			#Get the vehicle's current speed
+			self.carspeed = self.Car_sim.getCurrentSpeedKmHour()
+			
+			
+			#Engage clutch when in gear 0
+			if self.gear == 0:
+				self.clutch = 1
+			
+			
+			#Slow the steering when at higher speeds
+			self.steeringIncrement = self.steeringIncrement - self.carspeed / 1.5
+			
+			
+			#Reset the steering
+			if not inputState.isSet("L") and not inputState.isSet("R"):
+				
+				if self.steering < 0.00:
+					self.steering = self.steering + 0.6
+				if self.steering > 0.00:
+					self.steering = self.steering - 0.6
+					
+				if self.steering < 1.0 and self.steering > -1.0:
+					self.steering = 0
+			
+			
+			#Slow the car down while it's moving
+			if self.clutch == 0:
+				brakeForce = brakeForce + self.carspeed / 5
+			else:
+				brakeForce = brakeForce + self.carspeed / 15
 		
 			
 			#Forward
 			if self.start == 1:
 				if inputState.isSet("F"):
-					self.RPM = self.RPM + 20
+					self.RPM = self.RPM + 35
 					self.accelerate_sound.play()
 				if self.clutch == 0:
+					
 					if self.gear == -1:
-						engineForce = -self.RPM / 4
-						brakeForce = 0.0
+						if self.carspeed > self.carmaxreversespeed:	
+							engineForce = -self.RPM / 3
+							
 					if self.gear == 1:
-						engineForce = self.RPM / 3
-						brakeForce = 0.0
+						if self.carspeed < self.carmaxspeed:
+							engineForce = self.RPM / 1
+
 			
 			#Brake	
 			if inputState.isSet("B"):
 				engineForce = 0.0
 				brakeForce = 12.0
-				if self.clutch == 0:
-					if self.gear == 1:
-						self.RPM = self.RPM - 20
-					if self.gear == -1:
-						self.RPM = self.RPM -20
+				if self.gear != 0 and self.clutch == 0:
+					self.RPM = self.RPM - 20
 				
 			#Left	
 			if inputState.isSet("L"):
@@ -436,8 +481,9 @@ class Drive(ShowBase):
 				
 			#Park
 			if self.Pbrake == 1:
-				brakeForce = 6.0
-				self.clutch = 1
+				brakeForce = 10.0
+				if self.gear != 0 and self. clutch == 0:
+					self.RPM = self.RPM - 20
 				
 				
 			#Apply forces to wheels	
@@ -449,7 +495,7 @@ class Drive(ShowBase):
 			self.Car_sim.setSteeringValue(self.steering, 3);
 			
 			#Steering wheel
-			Sw.setHpr(0,0,-10*self.steering)
+			Sw.setHpr(0,0,-self.steering*10)
 		
 		
 		#The HUD
@@ -465,17 +511,26 @@ class Drive(ShowBase):
 		self.park = OnscreenImage(image = "Textures/pbrake.png", pos = (-0.8,0,-0.85), scale = (0.1))
 		self.park.setTransparency(TransparencyAttrib.MAlpha)
 		
-		self.rev_counter = OnscreenImage(image = "Textures/dial.png", pos = (-1.6, 0.0, -0.70), scale = (0.6,0.6,0.45))
+		self.rev_counter = OnscreenImage(image = "Textures/dial.png", pos = (-1.6, 0.0, -0.70), scale = (0.6,0.6,0.4))
 		self.rev_counter.setTransparency(TransparencyAttrib.MAlpha)
 		
 		self.rev_needle = OnscreenImage(image = "Textures/needle.png", pos = (-1.6, 0.0, -0.70), scale = (0.5))
 		self.rev_needle.setTransparency(TransparencyAttrib.MAlpha)
 		
-		self.rev_text = OnscreenText(text = " ", pos = (-1.6, -0.92, 0), scale = 0.05)
+		self.rev_text = OnscreenText(text = " ", pos = (-1.6, -0.90, 0), scale = 0.05)
+		
+		self.speedometer = OnscreenImage(image = "Textures/dial.png", pos = (-1.68, 0.0, -0.10), scale = (0.7,0.7,0.5))
+		self.speedometer.setTransparency(TransparencyAttrib.MAlpha)
+		
+		self.speedometer_needle = OnscreenImage(image = "Textures/needle.png", pos = (-1.68, 0.0, -0.10), scale = (0.5))
+		self.speedometer_needle.setTransparency(TransparencyAttrib.MAlpha)
+		
+		self.speedometer_text = OnscreenText(text = " ", pos = (-1.68, -0.35, 0), scale = 0.05)
 		
 		
 		#Update the HUD
 		def Update_HUD():
+			
 			#Move gear selector
 			if self.gear == -1:
 				self.gear2_hud.setPos(-1,0,-0.785)
@@ -500,11 +555,20 @@ class Drive(ShowBase):
 				
 			#Update the rev counter
 			self.rev_needle.setR(self.RPM/22)	
-			rev_string = str(self.RPM)
+			rev_string = str(self.RPM)[:4]
 			self.rev_text.setText(rev_string+" RPM")
 			
-			
-		#Update
+			#Update the speedometer
+			if self.carspeed > 0.0:
+				self.speedometer_needle.setR(self.carspeed*2.5)
+			if self.carspeed < 0.0:
+				self.speedometer_needle.setR(-self.carspeed*2.5)
+			speed_string = str(self.carspeed)[:3]
+			self.speedometer_text.setText(speed_string+" KPH")
+					
+					
+						
+		#Update the program
 		def update(task):
 			dt = globalClock.getDt() 
 			processInput(dt)
