@@ -1,6 +1,6 @@
 Welcome!
 
-Open-Driving-3D is a driving simulator that I'm making in python with panda3d. I plan to at some point add AI traffic. Its fairly simple right now, but its only on version 0.06.
+Open-Driving-3D is a driving simulator that I'm making in python with panda3d. I plan to at some point add AI traffic. Ok, I know you can't really do much in it right now, but its only on version 0.07.
 
 The reason I wanted to create a driving sim was because there don't seem to be enough free ones.
 
@@ -20,18 +20,18 @@ Brake = Down arrow
 
 Change View = 1, 2, 3
 
-Change gear = page up, page down
+Change gear = Page Up, Page Down
 
-Turn the car on and off = x
+Turn the car on and off = X
 
-Parking brake = p
+Parking brake = P
 
-Reset car = backspace
+Reset car = Backspace
 
-Hooter(Horn) = enter
+Horn = Enter
 
-Menu = escape
+Menu = ESC
 
-Screenshot = f12
+Screenshot = F12
 
-Headlights = h
+Headlights = H
