@@ -303,7 +303,7 @@ class Drive(ShowBase):
 		#The car
 		Car_shape = BulletBoxShape(Vec3(1, 2.0, 1.0))
 		Car_node = BulletRigidBodyNode("The Car")
-		Car_node.setMass(900.0)
+		Car_node.setMass(1200.0)
 		Car_node.addShape(Car_shape)
 		Car_np = render.attachNewNode(Car_node)
 		Car_np.setPos(0,0,3)
@@ -471,14 +471,26 @@ class Drive(ShowBase):
 				
 			#Left	
 			if inputState.isSet("L"):
-				self.steering += dt * self.steeringIncrement
-				self.steering = min(self.steering, self.steeringClamp)
+				if self.steering < 0.0:
+					#This makes the steering reset at the correct speed when turning from right to left
+					self.steering += dt * self.steeringIncrement + 0.6
+					self.steering = min(self.steering, self.steeringClamp)
+				else:
+					#Normal steering
+					self.steering += dt * self.steeringIncrement
+					self.steering = min(self.steering, self.steeringClamp)
 			
 			#Right	
 			if inputState.isSet("R"):
-				self.steering -= dt * self.steeringIncrement
-				self.steering = max(self.steering, -self.steeringClamp)
-				
+				if self.steering > 0.0:
+					#This makes the steering reset at the correct speed when turning from left to right
+					self.steering -= dt * self.steeringIncrement + 0.6
+					self.steering = max(self.steering, -self.steeringClamp)
+				else:
+					#Normal steering
+					self.steering -= dt * self.steeringIncrement
+					self.steering = max(self.steering, -self.steeringClamp)
+			
 			#Park
 			if self.Pbrake == 1:
 				brakeForce = 10.0
@@ -487,10 +499,10 @@ class Drive(ShowBase):
 				
 				
 			#Apply forces to wheels	
-			self.Car_sim.applyEngineForce(engineForce, 1);
-			self.Car_sim.applyEngineForce(engineForce, 2);
-			self.Car_sim.setBrake(brakeForce, 0);
-			self.Car_sim.setBrake(brakeForce, 3);
+			self.Car_sim.applyEngineForce(engineForce, 0);
+			self.Car_sim.applyEngineForce(engineForce, 3);
+			self.Car_sim.setBrake(brakeForce, 1);
+			self.Car_sim.setBrake(brakeForce, 2);
 			self.Car_sim.setSteeringValue(self.steering, 0);
 			self.Car_sim.setSteeringValue(self.steering, 3);
 			
